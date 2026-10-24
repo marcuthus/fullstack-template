@@ -1,12 +1,15 @@
 import { NextResponse } from "next/server"
+import { z } from "zod"
 
 import { UserRole } from "@/generated/prisma/client"
 import { AuthenticatedUser, authMiddleware, handleRouteError } from "@/helpers/auth.helper"
 import { signUpSchema } from "@/schemas/users/auth.schema"
-import { deleteUser, findUserById, updateUser } from "@/services/user.service"
+import { deleteUser, findUserById, updateUser, verifyUserPassword } from "@/services/user.service"
 
-// Schema for PATCH, all fields optional
-const patchUserSchema = signUpSchema.partial()
+// Schema for PATCH, all fields optional. Changing your own password requires the current one.
+const patchUserSchema = signUpSchema.partial().extend({
+    currentPassword: z.string().min(1).optional(),
+})
 
 async function checkAccess(auth: { user: AuthenticatedUser }, id: string) {
     if (auth.user.role === UserRole.ADMIN) return true
@@ -49,7 +52,19 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
         }
 
         const body = await request.json()
-        const validatedData = patchUserSchema.parse(body)
+        const { currentPassword, ...validatedData } = patchUserSchema.parse(body)
+
+        // Sem isso, um access token vazado bastava para trocar a senha e tomar a conta.
+        if (validatedData.password && auth.user.id === id) {
+            const isCurrentPasswordValid = await verifyUserPassword(id, currentPassword)
+
+            if (!isCurrentPasswordValid) {
+                return NextResponse.json(
+                    { message: "Current password is invalid" },
+                    { status: 401 }
+                )
+            }
+        }
 
         const user = await updateUser(id, validatedData)
 

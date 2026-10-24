@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server"
-import { ZodError } from "zod"
 
+import { handleRouteError } from "@/helpers/auth.helper"
 import { configHelper } from "@/helpers/config.helper"
 import { signInSchema } from "@/schemas/users/auth.schema"
 import { signIn } from "@/services/auth.service"
@@ -24,11 +24,6 @@ export async function POST(request: Request) {
 
         return response
     } catch (error) {
-        if (error instanceof ZodError) {
-            return NextResponse.json({ errors: error.issues }, { status: 400 })
-        }
-
-        const message = error instanceof Error ? error.message : "Erro interno"
-        return NextResponse.json({ message }, { status: 401 })
+        return handleRouteError(error)
     }
 }

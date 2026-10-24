@@ -162,7 +162,7 @@ describe("AuthService", () => {
             vi.mocked(jwtUtil.verifyToken).mockReturnValue({ sub: "no-one" } as any)
             vi.mocked(prisma.user.findUnique).mockResolvedValue(null)
 
-            await expect(refresh("token")).rejects.toThrow("Usuário não encontrado")
+            await expect(refresh("token")).rejects.toThrow("Token inválido ou expirado")
         })
     })
 })

@@ -1,5 +1,6 @@
 import * as crypto from "node:crypto"
 
+import { HttpError } from "../helpers/auth.helper"
 import { prisma } from "../helpers/prisma.helper"
 import { SignInValues, SignUpValues } from "../schemas/users/auth.schema"
 import { generateAccessToken, generateRefreshToken, verifyToken } from "../utils/jwt.util"
@@ -13,7 +14,7 @@ export async function signUp(data: SignUpValues) {
     })
 
     if (existingUser) {
-        throw new Error("Usuário ou e-mail já cadastrado")
+        throw new HttpError(409, "Usuário ou e-mail já cadastrado")
     }
 
     const hashedPassword = await hashPassword(data.password)
@@ -39,13 +40,13 @@ export async function signIn(data: SignInValues) {
     })
 
     if (!user) {
-        throw new Error("Credenciais inválidas")
+        throw new HttpError(401, "Credenciais inválidas")
     }
 
     const isPasswordValid = await comparePassword(data.password, user.password)
 
     if (!isPasswordValid) {
-        throw new Error("Credenciais inválidas")
+        throw new HttpError(401, "Credenciais inválidas")
     }
 
     const accessToken = generateAccessToken({
@@ -68,7 +69,7 @@ export async function refresh(token: string) {
     const payload = verifyToken(token, "refresh")
 
     if (!payload || !payload.sub) {
-        throw new Error("Token inválido ou expirado")
+        throw new HttpError(401, "Token inválido ou expirado")
     }
 
     const user = await prisma.user.findUnique({
@@ -76,7 +77,7 @@ export async function refresh(token: string) {
     })
 
     if (!user) {
-        throw new Error("Usuário não encontrado")
+        throw new HttpError(401, "Token inválido ou expirado")
     }
 
     const accessToken = generateAccessToken({

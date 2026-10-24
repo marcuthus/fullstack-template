@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest"
 
 import { POST } from "../auth/sign-up/route"
+import { HttpError } from "@/helpers/auth.helper"
 import * as authService from "@/services/auth.service"
 
 vi.mock("@/services/auth.service", () => ({
@@ -75,6 +76,29 @@ describe("SignUp API Route", () => {
         const data = await response.json()
 
         expect(response.status).toBe(500)
-        expect(data.message).toBe("Database error")
+        // A mensagem interna não deve vazar para o cliente
+        expect(data.message).toBe("Internal Server Error")
+    })
+
+    it("should return 409 when user already exists", async () => {
+        const body = {
+            name: "John Doe",
+            email: "john@example.com",
+            username: "johndoe",
+            password: "password123",
+        }
+
+        const request = new Request("http://localhost:3000/api/auth/sign-up", {
+            method: "POST",
+            body: JSON.stringify(body),
+        })
+
+        vi.mocked(authService.signUp).mockRejectedValue(
+            new HttpError(409, "Usuário ou e-mail já cadastrado")
+        )
+
+        const response = await POST(request)
+
+        expect(response.status).toBe(409)
     })
 })

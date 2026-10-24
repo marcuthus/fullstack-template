@@ -1,9 +1,10 @@
 import crypto from "node:crypto"
 
 import { Prisma, UserRole } from "@/generated/prisma/client"
+import { HttpError } from "@/helpers/auth.helper"
 import { prisma } from "@/helpers/prisma.helper"
 import { SignUpValues } from "@/schemas/users/auth.schema"
-import { hashPassword } from "@/utils/password.util"
+import { comparePassword, hashPassword } from "@/utils/password.util"
 
 export async function findUserById(id: string) {
     const user = await prisma.user.findUnique({
@@ -32,7 +33,7 @@ export async function createUser(data: SignUpValues) {
     })
 
     if (existingUser) {
-        throw new Error("User or email already registered")
+        throw new HttpError(409, "User or email already registered")
     }
 
     const hashedPassword = await hashPassword(data.password)
@@ -65,6 +66,19 @@ export async function updateUser(id: string, data: Partial<SignUpValues> & { rol
 
     const { password: _, ...userWithoutPassword } = user
     return userWithoutPassword
+}
+
+export async function verifyUserPassword(id: string, password: string | undefined) {
+    if (!password) return false
+
+    const user = await prisma.user.findUnique({
+        where: { id },
+        select: { password: true },
+    })
+
+    if (!user) return false
+
+    return await comparePassword(password, user.password)
 }
 
 export async function deleteUser(id: string) {
