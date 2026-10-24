@@ -1,6 +1,7 @@
 import { cookies } from "next/headers"
 import { NextResponse } from "next/server"
 
+import { handleRouteError } from "@/helpers/auth.helper"
 import { configHelper } from "@/helpers/config.helper"
 import { refreshTokenSchema } from "@/schemas/users/auth.schema"
 import { refresh } from "@/services/auth.service"
@@ -36,7 +37,6 @@ export async function POST(request: Request) {
 
         return response
     } catch (error) {
-        const message = error instanceof Error ? error.message : "Invalid refresh token"
-        return NextResponse.json({ message }, { status: 401 })
+        return handleRouteError(error)
     }
 }

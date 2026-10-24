@@ -9,6 +9,19 @@ export type AuthenticatedUser = {
     role?: string
 }
 
+/**
+ * Erro com status HTTP e mensagem segura para ser exibida ao cliente.
+ */
+export class HttpError extends Error {
+    constructor(
+        public readonly status: number,
+        message: string
+    ) {
+        super(message)
+        this.name = "HttpError"
+    }
+}
+
 export async function authMiddleware(
     request: Request,
     options?: { roles?: string[] }
@@ -41,13 +54,33 @@ export async function authMiddleware(
     }
 }
 
+function getPrismaErrorCode(error: unknown) {
+    if (typeof error === "object" && error !== null && "code" in error) {
+        const code = (error as { code?: unknown }).code
+        return typeof code === "string" && code.startsWith("P") ? code : null
+    }
+
+    return null
+}
+
 export function handleRouteError(error: unknown) {
     if (error instanceof ZodError) {
         return NextResponse.json({ errors: error.issues }, { status: 400 })
     }
 
-    const message = error instanceof Error ? error.message : "Internal Server Error"
-    const status = (error as { status?: number }).status || 500
+    if (error instanceof HttpError) {
+        return NextResponse.json({ message: error.message }, { status: error.status })
+    }
 
-    return NextResponse.json({ message }, { status })
+    switch (getPrismaErrorCode(error)) {
+        case "P2002":
+            return NextResponse.json({ message: "Conflict" }, { status: 409 })
+        case "P2025":
+            return NextResponse.json({ message: "Not Found" }, { status: 404 })
+    }
+
+    // Erros inesperados (banco, bibliotecas...) não devem ter a mensagem interna exposta ao cliente.
+    console.error(error)
+
+    return NextResponse.json({ message: "Internal Server Error" }, { status: 500 })
 }
